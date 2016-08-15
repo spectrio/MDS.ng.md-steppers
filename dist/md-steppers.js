@@ -5,9 +5,9 @@
 * Reference: https://github.com/angular/material
 */
 
-MdSteppersController.$inject = ["$scope", "$element", "$window", "$mdConstant", "$mdStepInkRipple", "$mdUtil", "$animateCss", "$attrs", "$compile", "$mdTheming"];
-MdSteppersTemplate.$inject = ["$compile", "$mdUtil"];
+MdSteppersController.$inject = ["$scope", "$element", "$window", "$mdConstant", "$mdStepInkRipple", "$mdUtil", "$animateCss", "$attrs", "$compile", "$mdTheming", "$rootScope"];
 MdStepScroll.$inject = ["$parse"];
+MdSteppersTemplate.$inject = ["$compile", "$mdUtil"];
 angular.module('md-steppers', [
   'material.core',
   'material.components.icon']);
@@ -127,6 +127,59 @@ function MdStepLabel() {
 }
 
 
+(function () {
+    'use strict';
+
+    /**
+   * @ngdoc service
+   * @name $mdStepInkRipple
+   * @module md-steppers
+   *
+   * @description
+   * TODO DOCS
+   *
+   */
+
+    MdStepInkRipple.$inject = ["$mdInkRipple"];
+    angular.module('md-steppers')
+      .factory('$mdStepInkRipple', MdStepInkRipple);
+
+    /**
+    * @ngInject
+    */
+    function MdStepInkRipple($mdInkRipple) {
+        return {
+            attach: attach
+        };
+
+        function attach(scope, element, options) {
+            return $mdInkRipple.attach(scope, element, angular.extend({
+                center: false,
+                dimBackground: true,
+                outline: false,
+                rippleSize: 'full'
+            }, options));
+        };
+    };
+})();
+
+angular.module('md-steppers')
+    .directive('mdStepScroll', MdStepScroll);
+
+function MdStepScroll($parse) {
+    return {
+        restrict: 'A',
+        compile: function ($element, attr) {
+            var fn = $parse(attr.mdStepScroll, null, true);
+            return function ngEventHandler(scope, element) {
+                element.on('mousewheel', function (event) {
+                    scope.$apply(function () { fn(scope, { $event: event }); });
+                });
+            };
+        }
+    }
+}
+
 angular
   .module('md-steppers')
   .controller('MdSteppersController', MdSteppersController);
@@ -135,7 +188,7 @@ angular
  * @ngInject
  */
 function MdSteppersController($scope, $element, $window, $mdConstant, $mdStepInkRipple,
-  $mdUtil, $animateCss, $attrs, $compile, $mdTheming) {
+  $mdUtil, $animateCss, $attrs, $compile, $mdTheming, $rootScope) {
   // define private properties
   var ctrl = this,
     locked = false,
@@ -192,6 +245,46 @@ function MdSteppersController($scope, $element, $window, $mdConstant, $mdStepInk
   ctrl.updateInkBarStyles = $mdUtil.debounce(updateInkBarStyles, 100);
   ctrl.updateStepOrder = $mdUtil.debounce(updateStepOrder, 100);
 
+  ctrl.history = {
+      prev: [],
+      next: [],
+      push: function( index ) {
+          if ( this.ignore ) {
+           this.ignore = false;
+           return;
+          }
+          if ( index != this.prev[this.prev.length - 1] && ctrl.selectedIndex !== index && index < ctrl.steppers.length ) {
+              return this.prev.push( index );
+          }
+      },
+      pop: function() { return this.prev.pop(); },
+      ignore: false,
+      handle: function(e) {
+          if( ( e.keyCode == 37 || e.keyCode == 39 ) && e.metaKey ) {
+              if ( e.keyCode == 37 && this.prev.length ) { // handle back
+                  $scope.$apply( angular.bind( this, function() {
+                      this.ignore = true;
+                      this.next.push( ctrl.selectedIndex );
+                      ctrl.selectedIndex = this.prev.pop();
+                  }));
+
+                  e.preventDefault();
+              }
+              if ( e.keyCode == 39 && this.next.length ) { // handle forward
+                  $scope.$apply( angular.bind( this, function() {
+                      this.ignore = true;
+                      this.prev.push( ctrl.selectedIndex );
+                      ctrl.selectedIndex = this.next.pop();
+                  }));
+
+                  e.preventDefault();
+              }
+          }
+      }
+  };
+
+  ctrl.historyHandler = angular.bind( ctrl.history, ctrl.history.handle );
+
   init();
 
   /**
@@ -230,6 +323,9 @@ function MdSteppersController($scope, $element, $window, $mdConstant, $mdStepInk
    */
   function bindEvents() {
     angular.element($window).on('resize', handleWindowResize);
+
+    angular.element( document.getElementsByTagName('body')[0] ).on('keydown', ctrl.historyHandler );
+
     $scope.$on('$destroy', cleanup);
   }
 
@@ -275,6 +371,7 @@ function MdSteppersController($scope, $element, $window, $mdConstant, $mdStepInk
   function cleanup() {
     destroyed = true;
     angular.element($window).off('resize', handleWindowResize);
+    angular.element( document.getElementsByTagName('body')[0]).off('keydown', ctrl.historyHandler );
   }
 
   // Change handlers
@@ -352,6 +449,8 @@ function MdSteppersController($scope, $element, $window, $mdConstant, $mdStepInk
     ctrl.updateInkBarStyles();
     updateHeightFromContent();
     adjustOffset(newValue);
+    ctrl.selectedIndex === newValue && ctrl.selectedIndex !== oldValue && ctrl.history.push( oldValue );
+
     $scope.$broadcast('$mdSteppersChanged');
     ctrl.steppers[oldValue] && ctrl.steppers[oldValue].scope.deselect();
     ctrl.steppers[newValue] && ctrl.steppers[newValue].scope.select();
@@ -1111,59 +1210,6 @@ function MdSteppersTemplate($compile, $mdUtil) {
 
         function reconnect() {
             if (ctrl.enableDisconnect) $mdUtil.reconnectScope(compileScope);
-        }
-    }
-}
-
-(function () {
-    'use strict';
-
-    /**
-   * @ngdoc service
-   * @name $mdStepInkRipple
-   * @module md-steppers
-   *
-   * @description
-   * TODO DOCS
-   *
-   */
-
-    MdStepInkRipple.$inject = ["$mdInkRipple"];
-    angular.module('md-steppers')
-      .factory('$mdStepInkRipple', MdStepInkRipple);
-
-    /**
-    * @ngInject
-    */
-    function MdStepInkRipple($mdInkRipple) {
-        return {
-            attach: attach
-        };
-
-        function attach(scope, element, options) {
-            return $mdInkRipple.attach(scope, element, angular.extend({
-                center: false,
-                dimBackground: true,
-                outline: false,
-                rippleSize: 'full'
-            }, options));
-        };
-    };
-})();
-
-angular.module('md-steppers')
-    .directive('mdStepScroll', MdStepScroll);
-
-function MdStepScroll($parse) {
-    return {
-        restrict: 'A',
-        compile: function ($element, attr) {
-            var fn = $parse(attr.mdStepScroll, null, true);
-            return function ngEventHandler(scope, element) {
-                element.on('mousewheel', function (event) {
-                    scope.$apply(function () { fn(scope, { $event: event }); });
-                });
-            };
         }
     }
 }
