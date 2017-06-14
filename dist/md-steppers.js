@@ -260,26 +260,26 @@ function MdSteppersController($scope, $element, $window, $mdConstant, $mdStepInk
       pop: function() { return this.prev.pop(); },
       ignore: false,
       handle: function(e) {
-          if( ( e.keyCode == 37 || e.keyCode == 39 ) && e.metaKey ) {
-              if ( e.keyCode == 37 && this.prev.length ) { // handle back
-                  $scope.$apply( angular.bind( this, function() {
-                      this.ignore = true;
-                      this.next.push( ctrl.selectedIndex );
-                      ctrl.selectedIndex = this.prev.pop();
-                  }));
-
-                  e.preventDefault();
-              }
-              if ( e.keyCode == 39 && this.next.length ) { // handle forward
-                  $scope.$apply( angular.bind( this, function() {
-                      this.ignore = true;
-                      this.prev.push( ctrl.selectedIndex );
-                      ctrl.selectedIndex = this.next.pop();
-                  }));
-
-                  e.preventDefault();
-              }
-          }
+		  if( ( e.keyCode == 37 || e.keyCode == 39 || e.keyCode == 219 || e.keyCode == 221) && e.metaKey ) {
+			  if ( ( e.keyCode == 37 || e.keyCode == 219 ) && this.prev.length ) { // handle back
+				  $scope.$apply( angular.bind( this, function() {
+					  this.ignore = true;
+					  this.next.push( ctrl.selectedIndex );
+					  ctrl.selectedIndex = this.prev.pop();
+				  }));
+			
+				  e.preventDefault();
+			  }
+			  if ( ( e.keyCode == 39 || e.keyCode == 221 ) && this.next.length ) { // handle forward
+				  $scope.$apply( angular.bind( this, function() {
+					  this.ignore = true;
+					  this.prev.push( ctrl.selectedIndex );
+					  ctrl.selectedIndex = this.next.pop();
+				  }));
+			
+				  e.preventDefault();
+			  }
+		  }
       }
   };
 
